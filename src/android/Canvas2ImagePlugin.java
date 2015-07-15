@@ -6,7 +6,7 @@ import java.util.Calendar;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
-
+import org.apache.cordova.PluginResult;
 import org.json.JSONArray;
 import org.json.JSONException;
 
@@ -19,6 +19,10 @@ import android.os.Environment;
 import android.util.Base64;
 import android.util.Log;
 
+import java.io.InputStream;
+ 
+import android.os.AsyncTask;
+
 /**
  * Canvas2ImagePlugin.java
  *
@@ -30,6 +34,8 @@ import android.util.Log;
  */
 public class Canvas2ImagePlugin extends CordovaPlugin {
 	public static final String ACTION = "saveImageDataToLibrary";
+	public static final String ACTION_URL = "saveUrlToLibrary";
+	
 
 	@Override
 	public boolean execute(String action, JSONArray data,
@@ -59,6 +65,20 @@ public class Canvas2ImagePlugin extends CordovaPlugin {
 				
 				callbackContext.success(imageFile.toString());
 			}
+			
+			return true;
+		} else if (action.equals(ACTION_URL)) {
+
+			String url = data.optString(0);
+			if (url.equals("")) // isEmpty() requires API level 9
+				callbackContext.error("Missing url string");
+			
+			// Create the bitmap from the base64 string
+			Log.d("Canvas2ImagePlugin", url);
+			PluginResult result = new PluginResult(PluginResult.Status.NO_RESULT);
+		    result.setKeepCallback(true);
+		    callbackContext.sendPluginResult(result);
+			new DownloadImage(callbackContext).execute(url);
 			
 			return true;
 		} else {
@@ -112,6 +132,51 @@ public class Canvas2ImagePlugin extends CordovaPlugin {
 					+ e.toString());
 		}
 		return retVal;
+	}
+
+	private class DownloadImage extends AsyncTask<String, Void, Bitmap> {
+ 		public CallbackContext callbackContext;
+
+ 		public DownloadImage(CallbackContext cb) {
+ 			this.callbackContext = cb;
+ 		}
+
+		@Override
+		protected Bitmap doInBackground(String... URL) {
+ 			
+			String imageURL = URL[0];
+ 
+			Bitmap bitmap = null;
+			try {
+				// Download Image from URL
+				InputStream input = new java.net.URL(imageURL).openStream();
+				// Decode Bitmap
+				bitmap = BitmapFactory.decodeStream(input);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			return bitmap;
+		}
+ 
+		@Override
+		protected void onPostExecute(Bitmap image) {
+			PluginResult result;
+			// Save the image
+			File imageFile = savePhoto(image);
+			if (imageFile == null) {
+				result = new PluginResult(PluginResult.Status.ERROR, "Error while saving image");
+			} else {
+				// Update image gallery
+				scanPhoto(imageFile);
+				result = new PluginResult(PluginResult.Status.OK, imageFile.toString());
+			}
+
+			result.setKeepCallback(false);
+            if (this.callbackContext != null) {
+                this.callbackContext.sendPluginResult(result);
+                this.callbackContext = null;
+            }
+		}
 	}
 	
 	/* Invoke the system's media scanner to add your photo to the Media Provider's database, 

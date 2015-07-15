@@ -9,6 +9,8 @@
 
 #import "Canvas2ImagePlugin.h"
 #import <Cordova/CDV.h>
+#import <AssetsLibrary/AssetsLibrary.h>
+
 
 @implementation Canvas2ImagePlugin
 @synthesize callbackId;
@@ -27,6 +29,35 @@
 	UIImage* image = [[[UIImage alloc] initWithData:imageData] autorelease];	
 	UIImageWriteToSavedPhotosAlbum(image, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
 	
+}
+
+- (void)saveUrlToLibrary:(CDVInvokedUrlCommand*)command
+{
+    self.callbackId = command.callbackId;
+
+    ALAssetsLibrary *library = [[ALAssetsLibrary alloc] init];
+    
+    NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:[command.arguments objectAtIndex:0]]];
+    [library writeImageDataToSavedPhotosAlbum:data metadata:nil completionBlock:^(NSURL *assetURL, NSError *error) {
+        // Was there an error?
+        if (error != NULL)
+        {
+            // Show error message...
+            NSLog(@"ERROR: %@",error);
+            CDVPluginResult* result = [CDVPluginResult resultWithStatus: CDVCommandStatus_ERROR messageAsString:error.description];
+            [self.commandDelegate sendPluginResult:result callbackId:self.callbackId];
+        }
+        else  // No errors
+        {
+            // Show message image successfully saved
+            NSLog(@"IMAGE SAVED!");
+            CDVPluginResult* result = [CDVPluginResult resultWithStatus: CDVCommandStatus_OK messageAsString:@"Image saved"];
+            [self.commandDelegate sendPluginResult:result callbackId:self.callbackId];
+        }
+    }];
+
+    //UIImageWriteToSavedPhotosAlbum(image, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
+    
 }
 
 - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo
